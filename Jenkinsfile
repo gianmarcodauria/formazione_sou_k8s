@@ -2,8 +2,7 @@ pipeline {
     agent any
 
     environment {
-        // Usa le credenziali DockerHub che hai aggiunto in Jenkins (ID = dockerhub-creds)
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
+        IMAGE_NAME = "flask-app-example"
     }
 
     stages {
@@ -30,27 +29,24 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build and Push Docker Image') {
             steps {
-                sh """
-                    docker build -t ${DOCKERHUB_CREDENTIALS_USR}/flask-app-example:${IMAGE_TAG} .
-                """
-            }
-        }
-
-        stage('Push Docker Image') {
-            steps {
-                sh """
-                    echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin
-                    docker push ${DOCKERHUB_CREDENTIALS_USR}/flask-app-example:${IMAGE_TAG}
-                """
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
+                                                 usernameVariable: 'DOCKER_USER', 
+                                                 passwordVariable: 'DOCKER_PASS')]) {
+                    sh """
+                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                        docker build -t $DOCKER_USER/$IMAGE_NAME:${IMAGE_TAG} .
+                        docker push $DOCKER_USER/$IMAGE_NAME:${IMAGE_TAG}
+                    """
+                }
             }
         }
     }
 
     post {
         success {
-            echo "Docker image pushed successfully!"
+            echo "Docker image pushed successfully: ${IMAGE_TAG}"
         }
         failure {
             echo "Pipeline failed. Check the logs."
