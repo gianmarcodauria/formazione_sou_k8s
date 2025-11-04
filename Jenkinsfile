@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
+        IMAGE_TAG = ''
     }
 
     stages {
@@ -16,7 +16,7 @@ pipeline {
             steps {
                 script {
                     if (env.GIT_TAG_NAME) {
-                        env.IMAGE_TAG = env.GIT_TAG_NAME
+                        env.IMAGE_TAG = "${env.GIT_TAG_NAME}"
                     } else if (env.BRANCH_NAME == 'main') {
                         env.IMAGE_TAG = 'latest'
                     } else if (env.BRANCH_NAME == 'develop') {
@@ -31,13 +31,14 @@ pipeline {
 
         stage('Build and Push Docker Image') {
             steps {
-                script {
-                    docker.build("${DOCKERHUB_CREDENTIALS_USR}/flask-app-example:${env.IMAGE_TAG}").withRun { c ->
-                        sh """
-                        echo "${DOCKERHUB_CREDENTIALS_PSW}" | docker login -u "${DOCKERHUB_CREDENTIALS_USR}" --password-stdin
-                        docker push ${DOCKERHUB_CREDENTIALS_USR}/flask-app-example:${env.IMAGE_TAG}
-                        """
-                    }
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
+                                                  usernameVariable: 'DOCKER_USER', 
+                                                  passwordVariable: 'DOCKER_PASS')]) {
+                    sh """
+                        echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
+                        docker build -t \$DOCKER_USER/flask-app-example:\$IMAGE_TAG .
+                        docker push \$DOCKER_USER/flask-app-example:\$IMAGE_TAG
+                    """
                 }
             }
         }
