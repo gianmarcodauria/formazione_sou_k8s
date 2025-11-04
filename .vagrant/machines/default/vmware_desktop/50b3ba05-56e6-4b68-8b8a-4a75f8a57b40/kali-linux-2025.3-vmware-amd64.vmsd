@@ -1,0 +1,5 @@
+.encoding = "UTF-8"
+cloneOf0 = "/Users/gianmarco.dauria/.vagrant.d/boxes/kalilinux-VAGRANTSLASH-rolling/2025.3.0/amd64/vmware_desktop/kali-linux-2025.3-vmware-amd64.vmx"
+numCloneOf = "1"
+sentinel0 = "kali-linux-2025.3-vmware-amd64-cl1.vmdk"
+numSentinels = "1"
