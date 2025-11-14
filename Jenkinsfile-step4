@@ -2,11 +2,27 @@ pipeline {
     agent any
 
     environment {
-        KUBECONFIG = '/var/jenkins_home/.kube/config'
-        PATH = "/var/jenkins_home/bin:${env.PATH}"
+        IMAGE_TAG = "latest"
     }
 
     stages {
+
+        stage('Check Credentials') {
+            steps {
+                script {
+                    def creds = com.cloudbees.plugins.credentials.CredentialsProvider.lookupCredentials(
+                        com.cloudbees.plugins.credentials.common.StandardCredentials,
+                        Jenkins.instance,
+                        null,
+                        null
+                    )
+                    println "=== CREDENZIALI DISPONIBILI SU QUESTO JENKINS ==="
+                    creds.each { println "- ID: ${it.id}  |  TYPE: ${it.class}" }
+                    println "=================================================="
+                }
+            }
+        }
+
         stage('Checkout') {
             steps {
                 checkout scm
@@ -16,13 +32,15 @@ pipeline {
         stage('Build & Push Docker Image') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: 'docker hub credentials',
-                                                     usernameVariable: 'DOCKER_USER',
-                                                     passwordVariable: 'DOCKER_PSW')]) {
+                    withCredentials([usernamePassword(
+                        credentialsId: 'docker hub credentials',
+                        usernameVariable: 'DOCKERHUB_CREDENTIALS_USR',
+                        passwordVariable: 'DOCKERHUB_CREDENTIALS_PSW'
+                    )]) {
                         sh """
-                        docker login -u $DOCKER_USER -p $DOCKER_PSW
-                        docker build -t $DOCKER_USER/flask-app-example:latest ./app
-                        docker push $DOCKER_USER/flask-app-example:latest
+                            echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin
+                            docker build -t ${DOCKERHUB_CREDENTIALS_USR}/flask-app-example:${IMAGE_TAG} .
+                            docker push ${DOCKERHUB_CREDENTIALS_USR}/flask-app-example:${IMAGE_TAG}
                         """
                     }
                 }
@@ -30,27 +48,21 @@ pipeline {
         }
 
         stage('Helm Deploy') {
+            when {
+                expression { return currentBuild.currentResult == 'SUCCESS' }
+            }
             steps {
-                script {
-                    dir('charts/flask-charts') {
-                        sh """
-                        helm upgrade --install flask-app . \
-                          --set image.repository=$DOCKER_USER/flask-app-example \
-                          --set image.tag=latest \
-                          --kubeconfig $KUBECONFIG
-                        """
-                    }
-                }
+                sh """
+                    helm upgrade --install flask-app ./charts/flask-app -n formazione-sou --create-namespace
+                """
             }
         }
     }
 
     post {
-        success {
-            echo "Deploy completato con successo!"
-        }
         failure {
             echo "Deploy fallito!"
         }
     }
 }
+
