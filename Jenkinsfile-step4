@@ -1,0 +1,67 @@
+pipeline {
+    agent any
+
+    environment {
+        // Credenziali DockerHub
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
+        IMAGE_NAME = "gianmarcodauria/flask-app-example"
+        IMAGE_TAG = "latest"
+
+        // Configurazione K8s / Helm
+        KUBECONFIG = "/var/jenkins_home/.kube/config"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                // Clona il repository GitHub
+                git url: 'https://github.com/gianmarcodauria/formazione_sou_k8s.git', branch: 'main'
+            }
+        }
+
+        stage('Docker Login') {
+            steps {
+                script {
+                    sh """
+                        echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin
+                    """
+                }
+            }
+        }
+
+        stage('Pull Image') {
+            steps {
+                // Se vuoi testare localmente l'immagine Docker
+                sh "docker pull ${IMAGE_NAME}:${IMAGE_TAG}"
+            }
+        }
+
+        stage('Deploy Helm') {
+            steps {
+                dir('flask-charts') {  // Cartella del chart nel repo
+                    sh """
+                        helm upgrade --install flask-app . \
+                          --set image.repository=${IMAGE_NAME} \
+                          --set image.tag=${IMAGE_TAG} \
+                          --kubeconfig $KUBECONFIG
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            // Logout da Docker
+            sh "docker logout"
+        }
+        success {
+            echo "Deploy completato con successo!"
+        }
+        failure {
+            echo "Deploy fallito!"
+        }
+    }
+}
+
+
