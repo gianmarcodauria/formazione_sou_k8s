@@ -7,22 +7,6 @@ pipeline {
 
     stages {
 
-        stage('Check Credentials') {
-            steps {
-                script {
-                    def creds = com.cloudbees.plugins.credentials.CredentialsProvider.lookupCredentials(
-                        com.cloudbees.plugins.credentials.common.StandardCredentials,
-                        Jenkins.instance,
-                        null,
-                        null
-                    )
-                    println "=== CREDENZIALI DISPONIBILI SU QUESTO JENKINS ==="
-                    creds.each { println "- ID: ${it.id}  |  TYPE: ${it.class}" }
-                    println "=================================================="
-                }
-            }
-        }
-
         stage('Checkout') {
             steps {
                 checkout scm
