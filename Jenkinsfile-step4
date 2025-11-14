@@ -16,16 +16,18 @@ pipeline {
         stage('Build & Push Podman Image') {
             steps {
                 script {
+                    // Usa le credenziali salvate in Jenkins
                     withCredentials([usernamePassword(
                         credentialsId: 'dockerhub-credentials',
                         usernameVariable: 'DOCKERHUB_CREDENTIALS_USR',
                         passwordVariable: 'DOCKERHUB_CREDENTIALS_PSW'
                     )]) {
-                        sh """
-                            echo ${DOCKERHUB_CREDENTIALS_PSW} | podman login docker.io -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin
-                            podman build -t ${DOCKERHUB_CREDENTIALS_USR}/flask-app-example:${IMAGE_TAG} .
-                            podman push ${DOCKERHUB_CREDENTIALS_USR}/flask-app-example:${IMAGE_TAG}
-                        """
+                        // Nota: evitiamo Groovy string interpolation per il segreto
+                        sh '''
+                            echo $DOCKERHUB_CREDENTIALS_PSW | podman login docker.io -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
+                            podman build -t $DOCKERHUB_CREDENTIALS_USR/flask-app-example:$IMAGE_TAG .
+                            podman push $DOCKERHUB_CREDENTIALS_USR/flask-app-example:$IMAGE_TAG
+                        '''
                     }
                 }
             }
@@ -33,12 +35,12 @@ pipeline {
 
         stage('Helm Deploy') {
             when {
-                expression { return currentBuild.currentResult == 'SUCCESS' }
+                expression { currentBuild.currentResult == 'SUCCESS' }
             }
             steps {
-                sh """
+                sh '''
                     helm upgrade --install flask-app ./charts/flask-app -n formazione-sou --create-namespace
-                """
+                '''
             }
         }
     }
@@ -46,6 +48,9 @@ pipeline {
     post {
         failure {
             echo "Deploy fallito!"
+        }
+        success {
+            echo "Build e deploy completati correttamente!"
         }
     }
 }
