@@ -21,15 +21,11 @@ pipeline {
                         usernameVariable: 'DOCKERHUB_CREDENTIALS_USR',
                         passwordVariable: 'DOCKERHUB_CREDENTIALS_PSW'
                     )]) {
+                        // Usa sh con stringa singola per evitare warning secret interpolation
                         sh '''
-                            # Login Docker
-                            echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
-
-                            # Build image
-                            docker build -t $DOCKERHUB_CREDENTIALS_USR/flask-app-example:$IMAGE_TAG .
-
-                            # Push image
-                            docker push $DOCKERHUB_CREDENTIALS_USR/flask-app-example:$IMAGE_TAG
+                            echo "$DOCKERHUB_CREDENTIALS_PSW" | docker login -u "$DOCKERHUB_CREDENTIALS_USR" --password-stdin
+                            docker build -t "$DOCKERHUB_CREDENTIALS_USR/flask-app-example:$IMAGE_TAG" .
+                            docker push "$DOCKERHUB_CREDENTIALS_USR/flask-app-example:$IMAGE_TAG"
                         '''
                     }
                 }
@@ -51,6 +47,9 @@ pipeline {
     post {
         failure {
             echo "Deploy fallito!"
+        }
+        success {
+            echo "Deploy completato con successo!"
         }
     }
 }
