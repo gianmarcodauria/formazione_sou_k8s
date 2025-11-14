@@ -13,7 +13,7 @@ pipeline {
             }
         }
 
-        stage('Build & Push Docker Image') {
+        stage('Build & Push Podman Image') {
             steps {
                 script {
                     withCredentials([usernamePassword(
@@ -22,9 +22,9 @@ pipeline {
                         passwordVariable: 'DOCKERHUB_CREDENTIALS_PSW'
                     )]) {
                         sh """
-                            echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin
-                            docker build -t ${DOCKERHUB_CREDENTIALS_USR}/flask-app-example:${IMAGE_TAG} .
-                            docker push ${DOCKERHUB_CREDENTIALS_USR}/flask-app-example:${IMAGE_TAG}
+                            echo ${DOCKERHUB_CREDENTIALS_PSW} | podman login docker.io -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin
+                            podman build -t ${DOCKERHUB_CREDENTIALS_USR}/flask-app-example:${IMAGE_TAG} .
+                            podman push ${DOCKERHUB_CREDENTIALS_USR}/flask-app-example:${IMAGE_TAG}
                         """
                     }
                 }
