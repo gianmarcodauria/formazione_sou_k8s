@@ -7,26 +7,29 @@ pipeline {
 
     stages {
 
-        stage('Checkout') {
+        stage('Checkout SCM') {
             steps {
                 checkout scm
             }
         }
 
-        stage('Build & Push Podman Image') {
+        stage('Build & Push Docker Image') {
             steps {
                 script {
-                    // Usa le credenziali salvate in Jenkins
                     withCredentials([usernamePassword(
                         credentialsId: 'dockerhub-credentials',
                         usernameVariable: 'DOCKERHUB_CREDENTIALS_USR',
                         passwordVariable: 'DOCKERHUB_CREDENTIALS_PSW'
                     )]) {
-                        // Nota: evitiamo Groovy string interpolation per il segreto
                         sh '''
-                            echo $DOCKERHUB_CREDENTIALS_PSW | podman login docker.io -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
-                            podman build -t $DOCKERHUB_CREDENTIALS_USR/flask-app-example:$IMAGE_TAG .
-                            podman push $DOCKERHUB_CREDENTIALS_USR/flask-app-example:$IMAGE_TAG
+                            # Login Docker
+                            echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
+
+                            # Build image
+                            docker build -t $DOCKERHUB_CREDENTIALS_USR/flask-app-example:$IMAGE_TAG .
+
+                            # Push image
+                            docker push $DOCKERHUB_CREDENTIALS_USR/flask-app-example:$IMAGE_TAG
                         '''
                     }
                 }
@@ -48,9 +51,6 @@ pipeline {
     post {
         failure {
             echo "Deploy fallito!"
-        }
-        success {
-            echo "Build e deploy completati correttamente!"
         }
     }
 }
