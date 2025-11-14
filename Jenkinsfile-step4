@@ -2,59 +2,50 @@ pipeline {
     agent any
 
     environment {
-        // Credenziali DockerHub
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
-        IMAGE_NAME = "gianmarcodauria/flask-app-example"
-        IMAGE_TAG = "latest"
-
-        // Configurazione K8s / Helm
-        KUBECONFIG = "/var/jenkins_home/.kube/config"
+        KUBECONFIG = '/var/jenkins_home/.kube/config'
+        PATH = "/var/jenkins_home/bin:${env.PATH}"
     }
 
     stages {
         stage('Checkout') {
             steps {
-                // Clona il repository GitHub
-                git url: 'https://github.com/gianmarcodauria/formazione_sou_k8s.git', branch: 'main'
+                checkout scm
             }
         }
 
-        stage('Docker Login') {
+        stage('Build & Push Docker Image') {
             steps {
                 script {
-                    sh """
-                        echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin
-                    """
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials',
+                                                     usernameVariable: 'DOCKER_USER',
+                                                     passwordVariable: 'DOCKER_PSW')]) {
+                        sh """
+                        docker login -u $DOCKER_USER -p $DOCKER_PSW
+                        docker build -t $DOCKER_USER/flask-app-example:latest ./app
+                        docker push $DOCKER_USER/flask-app-example:latest
+                        """
+                    }
                 }
             }
         }
 
-        stage('Pull Image') {
+        stage('Helm Deploy') {
             steps {
-                // Se vuoi testare localmente l'immagine Docker
-                sh "docker pull ${IMAGE_NAME}:${IMAGE_TAG}"
-            }
-        }
-
-        stage('Deploy Helm') {
-            steps {
-                dir('flask-charts') {  // Cartella del chart nel repo
-                    sh """
+                script {
+                    dir('charts/flask-charts') {
+                        sh """
                         helm upgrade --install flask-app . \
-                          --set image.repository=${IMAGE_NAME} \
-                          --set image.tag=${IMAGE_TAG} \
+                          --set image.repository=$DOCKER_USER/flask-app-example \
+                          --set image.tag=latest \
                           --kubeconfig $KUBECONFIG
-                    """
+                        """
+                    }
                 }
             }
         }
     }
 
     post {
-        always {
-            // Logout da Docker
-            sh "docker logout"
-        }
         success {
             echo "Deploy completato con successo!"
         }
@@ -63,5 +54,3 @@ pipeline {
         }
     }
 }
-
-
