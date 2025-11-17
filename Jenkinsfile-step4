@@ -10,28 +10,38 @@ pipeline {
             }
         }
 
+        stage('Check Tools') {
+            steps {
+                sh '''
+                echo "Verifying tools..."
+                which kubectl
+                kubectl version --client
+                which helm
+                helm version
+                '''
+            }
+        }
+
         stage('Prepare Namespace') {
             steps {
-                script {
-                    sh '''
-                    kubectl get namespace formazione-sou || \
-                    kubectl create namespace formazione-sou
-                    '''
-                }
+                sh '''
+                kubectl get namespace formazione-sou || kubectl create namespace formazione-sou
+                '''
             }
         }
 
         stage('Helm Lint') {
             steps {
-                sh 'helm lint ./charts/flask-app'
+                sh 'helm lint charts/flask-app'
             }
         }
 
         stage('Helm Install or Upgrade') {
             steps {
                 sh '''
-                helm upgrade --install flask-app ./charts/flask-app \
-                --namespace formazione-sou
+                helm upgrade --install flask-app charts/flask-app \
+                  --namespace formazione-sou \
+                  --set image.tag=${IMAGE_TAG}
                 '''
             }
         }
@@ -39,18 +49,18 @@ pipeline {
         stage('Verify Deployment') {
             steps {
                 sh '''
-                kubectl get pods -n formazione-sou
-                kubectl get svc -n formazione-sou
+                kubectl rollout status deployment/flask-app -n formazione-sou
                 '''
             }
         }
     }
+
     post {
         success {
-            echo 'Pipeline completata con successo!'
+            echo "Pipeline completata con successo!"
         }
         failure {
-            echo 'Errore nella pipeline.'
+            echo "Errore nella pipeline."
         }
     }
 }
