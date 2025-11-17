@@ -1,58 +1,57 @@
 pipeline {
     agent any
-
     environment {
-        PATH = "$PATH:/var/jenkins_home/bin"  // Assicurati che kubectl e helm siano qui
-        GIT_REPO = 'https://github.com/gianmarcodauria/formazione_sou_k8s.git'
-        GIT_BRANCH = 'main'
-        HELM_RELEASE = 'formazione-sou-release'
-        HELM_NAMESPACE = 'formazione-sou'
-        CHART_PATH = './charts/flask-charts'
+        PATH = "/var/jenkins_home/tools:${env.PATH}"
     }
-
     stages {
-        stage('Verify Tools') {
+        stage('Checkout SCM') {
             steps {
-                sh "which kubectl"
-                sh "kubectl version --client"
-                sh "which helm"
-                sh "helm version"
-            }
-        }
-
-        stage('Checkout Chart') {
-            steps {
-                git branch: "${GIT_BRANCH}", url: "${GIT_REPO}"
+                checkout scm
             }
         }
 
         stage('Prepare Namespace') {
             steps {
                 script {
-                    sh """
-                        if ! kubectl get namespace ${HELM_NAMESPACE} >/dev/null 2>&1; then
-                            kubectl create namespace ${HELM_NAMESPACE}
-                        fi
-                    """
+                    sh '''
+                    kubectl get namespace formazione-sou || \
+                    kubectl create namespace formazione-sou
+                    '''
                 }
             }
         }
 
         stage('Helm Lint') {
             steps {
-                sh "helm lint ${CHART_PATH}"
+                sh 'helm lint ./charts/flask-app'
             }
         }
 
         stage('Helm Install or Upgrade') {
             steps {
-                script {
-                    def exists = sh(
-                        script: "helm list -n ${HELM_NAMESPACE} | grep ${HELM_RELEASE} || true",
-                        returnStdout: true
-                    ).trim()
+                sh '''
+                helm upgrade --install flask-app ./charts/flask-app \
+                --namespace formazione-sou
+                '''
+            }
+        }
 
-                    if (exists) {
-                        echo "Release ${HELM_RELEASE} già presente. Eseguo upgrade."
-                        sh "helm upgrade ${HELM_RELEASE} ${CHART_PATH} -n ${
+        stage('Verify Deployment') {
+            steps {
+                sh '''
+                kubectl get pods -n formazione-sou
+                kubectl get svc -n formazione-sou
+                '''
+            }
+        }
+    }
+    post {
+        success {
+            echo 'Pipeline completata con successo!'
+        }
+        failure {
+            echo 'Errore nella pipeline.'
+        }
+    }
+}
 
