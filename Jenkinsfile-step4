@@ -1,65 +1,44 @@
 pipeline {
     agent any
-
     environment {
-        PATH = "/usr/local/bin/tools:${env.PATH}"
-        NAMESPACE = "formazione-sou"
-        CHART_DIR = "charts/flask-charts"
+        KUBECONFIG = '/var/jenkins_home/kubeconfig'
     }
-
     stages {
         stage('Checkout SCM') {
             steps {
-                checkout scm
+                git url: 'https://github.com/gianmarcodauria/formazione_sou_k8s', branch: 'main'
             }
         }
-
         stage('Prepare Namespace') {
             steps {
                 script {
-                    def nsExists = sh(
-                        script: "kubectl get namespace ${NAMESPACE} --ignore-not-found",
-                        returnStatus: true
-                    )
-                    if (nsExists != 0) {
-                        sh "kubectl create namespace ${NAMESPACE}"
-                    }
+                    sh 'kubectl get namespace formazione-sou --ignore-not-found || kubectl create namespace formazione-sou'
                 }
             }
         }
-
         stage('Helm Lint') {
             steps {
-                sh "helm lint ${CHART_DIR}"
+                sh 'helm lint ./helm/flask-app --namespace formazione-sou'
             }
         }
-
         stage('Helm Install or Upgrade') {
             steps {
-                sh """
-                    helm upgrade --install flask-app ${CHART_DIR} \
-                        --namespace ${NAMESPACE} \
+                sh '''
+                    helm upgrade --install flask-app ./helm/flask-app \
+                        --namespace formazione-sou \
                         --set image.tag=latest
-                """
+                '''
             }
         }
-
         stage('Verify Deployment') {
             steps {
-                sh "kubectl get pods -n ${NAMESPACE}"
+                sh 'kubectl get pods -n formazione-sou'
             }
         }
     }
-
     post {
-        always {
-            echo "Pipeline finished."
-        }
-        success {
-            echo "Deployment succeeded!"
-        }
         failure {
-            echo "Errore nella pipeline."
+            echo 'Errore nella pipeline.'
         }
     }
 }
