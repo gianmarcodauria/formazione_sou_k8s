@@ -2,56 +2,57 @@ pipeline {
     agent any
 
     environment {
-	PATH = "$PATH:/var/jenkins_home/bin"
-        IMAGE_TAG = "latest"
+        PATH = "$PATH:/var/jenkins_home/bin"  // Assicurati che kubectl e helm siano qui
+        GIT_REPO = 'https://github.com/gianmarcodauria/formazione_sou_k8s.git'
+        GIT_BRANCH = 'main'
+        HELM_RELEASE = 'formazione-sou-release'
+        HELM_NAMESPACE = 'formazione-sou'
+        CHART_PATH = './charts/flask-charts'
     }
 
     stages {
-
-        stage('Checkout SCM') {
+        stage('Verify Tools') {
             steps {
-                checkout scm
+                sh "which kubectl"
+                sh "kubectl version --client"
+                sh "which helm"
+                sh "helm version"
             }
         }
 
-        stage('Build & Push Docker Image') {
+        stage('Checkout Chart') {
+            steps {
+                git branch: "${GIT_BRANCH}", url: "${GIT_REPO}"
+            }
+        }
+
+        stage('Prepare Namespace') {
             steps {
                 script {
-                    withCredentials([usernamePassword(
-                        credentialsId: 'dockerhub-credentials',
-                        usernameVariable: 'DOCKERHUB_CREDENTIALS_USR',
-                        passwordVariable: 'DOCKERHUB_CREDENTIALS_PSW'
-                    )]) {
-                        // Usa sh con stringa singola per evitare warning secret interpolation
-                        sh '''
-                            echo "$DOCKERHUB_CREDENTIALS_PSW" | docker login -u "$DOCKERHUB_CREDENTIALS_USR" --password-stdin
-                            docker build -t "$DOCKERHUB_CREDENTIALS_USR/flask-app-example:$IMAGE_TAG" .
-                            docker push "$DOCKERHUB_CREDENTIALS_USR/flask-app-example:$IMAGE_TAG"
-                        '''
-                    }
+                    sh """
+                        if ! kubectl get namespace ${HELM_NAMESPACE} >/dev/null 2>&1; then
+                            kubectl create namespace ${HELM_NAMESPACE}
+                        fi
+                    """
                 }
             }
         }
 
-        stage('Helm Deploy') {
-            when {
-                expression { currentBuild.currentResult == 'SUCCESS' }
-            }
+        stage('Helm Lint') {
             steps {
-                sh '''
-                    helm upgrade --install flask-app ./charts/flask-app -n formazione-sou --create-namespace
-                '''
+                sh "helm lint ${CHART_PATH}"
             }
         }
-    }
 
-    post {
-        failure {
-            echo "Deploy fallito!"
-        }
-        success {
-            echo "Deploy completato con successo!"
-        }
-    }
-}
+        stage('Helm Install or Upgrade') {
+            steps {
+                script {
+                    def exists = sh(
+                        script: "helm list -n ${HELM_NAMESPACE} | grep ${HELM_RELEASE} || true",
+                        returnStdout: true
+                    ).trim()
+
+                    if (exists) {
+                        echo "Release ${HELM_RELEASE} già presente. Eseguo upgrade."
+                        sh "helm upgrade ${HELM_RELEASE} ${CHART_PATH} -n ${
 
