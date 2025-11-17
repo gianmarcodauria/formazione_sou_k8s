@@ -2,10 +2,9 @@ pipeline {
     agent any
 
     environment {
-        PATH = "/var/jenkins_home/tools:$PATH"
+        PATH = "/usr/local/bin/tools:${env.PATH}"
         NAMESPACE = "formazione-sou"
-        CHART_PATH = "charts/flask-charts"
-        RELEASE_NAME = "flask-app"
+        CHART_DIR = "charts/flask-charts"
     }
 
     stages {
@@ -18,34 +17,36 @@ pipeline {
         stage('Prepare Namespace') {
             steps {
                 script {
-                    sh """
-                    if ! kubectl get namespace ${NAMESPACE}; then
-                        kubectl create namespace ${NAMESPACE}
-                    fi
-                    """
+                    def nsExists = sh(
+                        script: "kubectl get namespace ${NAMESPACE} --ignore-not-found",
+                        returnStatus: true
+                    )
+                    if (nsExists != 0) {
+                        sh "kubectl create namespace ${NAMESPACE}"
+                    }
                 }
             }
         }
 
         stage('Helm Lint') {
             steps {
-                sh "helm lint ${CHART_PATH}"
+                sh "helm lint ${CHART_DIR}"
             }
         }
 
         stage('Helm Install or Upgrade') {
             steps {
                 sh """
-                helm upgrade --install ${RELEASE_NAME} ${CHART_PATH} \
-                    --namespace ${NAMESPACE} \
-                    --create-namespace
+                    helm upgrade --install flask-app ${CHART_DIR} \
+                        --namespace ${NAMESPACE} \
+                        --set image.tag=latest
                 """
             }
         }
 
         stage('Verify Deployment') {
             steps {
-                sh "kubectl get all -n ${NAMESPACE}"
+                sh "kubectl get pods -n ${NAMESPACE}"
             }
         }
     }
@@ -53,6 +54,9 @@ pipeline {
     post {
         always {
             echo "Pipeline finished."
+        }
+        success {
+            echo "Deployment succeeded!"
         }
         failure {
             echo "Errore nella pipeline."
