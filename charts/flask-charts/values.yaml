@@ -1,34 +1,47 @@
-# Default values for flask-charts.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
-
 replicaCount: 1
 
 image:
-  repository: gdauria/flask-app-example
-  pullPolicy: IfNotPresent
-  tag: "dev-11"
+  repository: flask-app
+  tag: latest
+  pullPolicy: Never
 
-imagePullSecrets: []
-nameOverride: ""
-fullnameOverride: ""
-
-serviceAccount:
-  create: true
-  automount: true
-  annotations: {}
-  name: ""
-
-podAnnotations: {}
-podLabels: {}
-
-podSecurityContext: {}
-securityContext: {}
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
 
 service:
   type: NodePort
   port: 5000
   nodePort: 30000
+
+serviceAccount:
+  create: true
+  automount: true
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+podSecurityContext: {}
+securityContext: {}
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+
+httpRoute:
+  enabled: false
+  annotations: {}
+  parentRefs: []
+  hostnames: []
+  rules: []
 
 ingress:
   enabled: false
@@ -41,41 +54,10 @@ ingress:
           pathType: ImplementationSpecific
   tls: []
 
-httpRoute:
-  enabled: false
-  annotations: {}
-  parentRefs:
-  - name: gateway
-    sectionName: http
-  hostnames:
-  - chart-example.local
-  rules:
-  - matches:
-    - path:
-        type: PathPrefix
-        value: /headers
-
-resources: {}
-
-livenessProbe:
-  httpGet:
-    path: /
-    port: http
-
-readinessProbe:
-  httpGet:
-    path: /
-    port: http
-
-autoscaling:
-  enabled: false
-  minReplicas: 1
-  maxReplicas: 100
-  targetCPUUtilizationPercentage: 80
-
 volumes: []
 volumeMounts: []
 
 nodeSelector: {}
 tolerations: []
 affinity: {}
+

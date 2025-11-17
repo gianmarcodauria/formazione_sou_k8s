@@ -1,0 +1,68 @@
+pipeline {
+    agent any // girerà sul master
+
+    environment {
+        GIT_REPO = 'https://github.com/gianmarcodauria/formazione_sou_k8s.git'
+        GIT_BRANCH = 'main'
+        HELM_RELEASE = 'formazione-sou-release'
+        HELM_NAMESPACE = 'formazione-sou'
+        CHART_PATH = './charts/flask-charts'
+    }
+
+    stages {
+        stage('Checkout Chart') {
+            steps {
+                git branch: "${GIT_BRANCH}", url: "${GIT_REPO}"
+            }
+        }
+
+        stage('Prepare Namespace') {
+            steps {
+                script {
+                    sh "kubectl get namespace ${HELM_NAMESPACE} || kubectl create namespace ${HELM_NAMESPACE}"
+                }
+            }
+        }
+
+        stage('Helm Lint') {
+            steps {
+                sh "helm lint ${CHART_PATH}"
+            }
+        }
+
+        stage('Helm Install or Upgrade') {
+            steps {
+                script {
+                    def exists = sh(
+                        script: "helm list -n ${HELM_NAMESPACE} | grep ${HELM_RELEASE} || true",
+                        returnStdout: true
+                    ).trim()
+
+                    if (exists) {
+                        echo "Release ${HELM_RELEASE} già presente. Eseguo upgrade."
+                        sh "helm upgrade ${HELM_RELEASE} ${CHART_PATH} -n ${HELM_NAMESPACE} -f ${CHART_PATH}/values.yaml --wait --atomic"
+                    } else {
+                        echo "Release ${HELM_RELEASE} non trovata. Eseguo install."
+                        sh "helm install ${HELM_RELEASE} ${CHART_PATH} -n ${HELM_NAMESPACE} -f ${CHART_PATH}/values.yaml --wait --atomic"
+                    }
+                }
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                sh "kubectl get pods -n ${HELM_NAMESPACE}"
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Helm install/upgrade completato con successo."
+        }
+        failure {
+            echo "Errore nella pipeline."
+        }
+    }
+}
+
