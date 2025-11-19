@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: lorenzotomo/flask-hello-world
+  repository: gdauria/flask-hello-world
   tag: "latest"
   pullPolicy: IfNotPresent
 
