@@ -5,7 +5,7 @@ pipeline {
         DOCKERHUB_USER = 'gdauria'
         IMAGE_NAME = 'flask-hello-world'
         REGISTRY = 'docker.io'
-        KUBE_NAMESPACE = 'formazione-su'
+        KUBE_NAMESPACE = 'formazione-sou'
         HELM_RELEASE = 'flask-app'
         CHART_PATH = 'charts/flask-app' 
         KUBECONFIG_ID = 'minikube-credentials' 
